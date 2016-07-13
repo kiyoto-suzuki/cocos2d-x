@@ -70,6 +70,13 @@ void ClippingRectangleNode::onAfterVisitScissor()
 
 void ClippingRectangleNode::visit(Renderer *renderer, const Mat4 &parentTransform, uint32_t parentFlags)
 {
+    // reduce unnecessary rendering commands when using multiple cameras
+    {
+        if (!_visible || !isVisitableByVisitingCamera()) {
+            return;
+        }
+    }
+
     _beforeVisitCmdScissor.init(_globalZOrder);
     _beforeVisitCmdScissor.func = CC_CALLBACK_0(ClippingRectangleNode::onBeforeVisitScissor, this);
     renderer->addCommand(&_beforeVisitCmdScissor);
