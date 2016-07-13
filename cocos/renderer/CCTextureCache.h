@@ -215,6 +215,8 @@ public:
     */
     void renameTextureWithKey(const std::string& srcName, const std::string& dstName);
 
+    // toybox for TextureViewer.
+    const std::unordered_map<std::string, Texture2D*>& getTextures() const { return _textures; }
 
 private:
     void addImageAsyncCallBack(float dt);
