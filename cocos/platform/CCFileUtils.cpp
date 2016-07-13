@@ -764,6 +764,8 @@ std::string FileUtils::getPathForFilename(const std::string& filename, const std
 
 std::string FileUtils::fullPathForFilename(const std::string &filename) const
 {
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
     if (filename.empty())
     {
         return "";
