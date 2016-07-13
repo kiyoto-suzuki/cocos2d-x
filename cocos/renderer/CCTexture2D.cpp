@@ -107,6 +107,12 @@ namespace {
         PixelFormatInfoMapValue(Texture2D::PixelFormat::ATC_INTERPOLATED_ALPHA, Texture2D::PixelFormatInfo(GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD,
             0xFFFFFFFF, 0xFFFFFFFF, 8, true, false)),
 #endif
+        // GL_COMPRESSED_RGB8_ETC2 for ETC2
+        PixelFormatInfoMapValue(Texture2D::PixelFormat::ETC2_RGB, Texture2D::PixelFormatInfo(0x9274, 0xFFFFFFFF, 0xFFFFFFFF, 4, true, false)),
+        // GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 for ETC2
+        PixelFormatInfoMapValue(Texture2D::PixelFormat::ETC2_RGBA1, Texture2D::PixelFormatInfo(0x9276, 0xFFFFFFFF, 0xFFFFFFFF, 4, true, false)),
+        // GL_COMPRESSED_RGBA8_ETC2_EAC for ETC2
+        PixelFormatInfoMapValue(Texture2D::PixelFormat::ETC2_RGBA, Texture2D::PixelFormatInfo(0x9278, 0xFFFFFFFF, 0xFFFFFFFF, 8, true, false)),
     };
 }
 
@@ -1392,6 +1398,10 @@ const char* Texture2D::getStringForFormat() const
 
         case Texture2D::PixelFormat::ATC_INTERPOLATED_ALPHA:
             return "ATC_INTERPOLATED_ALPHA";
+
+        case Texture2D::PixelFormat::ETC2_RGB  : return "ETC2_RGB";
+        case Texture2D::PixelFormat::ETC2_RGBA1: return "ETC2_RGBA1";
+        case Texture2D::PixelFormat::ETC2_RGBA : return "ETC2_RGBA";
             
         default:
             CCASSERT(false , "unrecognized pixel format");

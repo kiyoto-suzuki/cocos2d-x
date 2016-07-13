@@ -232,6 +232,9 @@ namespace
         _pixel3_formathash::value_type(PVR3TexturePixelFormat::PVRTC4BPP_RGBA,      Texture2D::PixelFormat::PVRTC4A),
 
         _pixel3_formathash::value_type(PVR3TexturePixelFormat::ETC1,        Texture2D::PixelFormat::ETC),
+        _pixel3_formathash::value_type(PVR3TexturePixelFormat::ETC2_RGB, Texture2D::PixelFormat::ETC2_RGB),     // for ETC2
+        _pixel3_formathash::value_type(PVR3TexturePixelFormat::ETC2_RGBA, Texture2D::PixelFormat::ETC2_RGBA),   // for ETC2
+        _pixel3_formathash::value_type(PVR3TexturePixelFormat::ETC2_RGBA1, Texture2D::PixelFormat::ETC2_RGBA1), // for ETC2
     };
         
     static const int PVR3_MAX_TABLE_ELEMENTS = sizeof(v3_pixel_formathash_value) / sizeof(v3_pixel_formathash_value[0]);
@@ -609,10 +612,15 @@ bool Image::isPng(const unsigned char * data, ssize_t dataLen)
 
 bool Image::isEtc(const unsigned char * data, ssize_t dataLen)
 {
+    // for ETC2
+    static const char ETC2_SIGNATURE[] = { 'P', 'K', 'M', ' ', '2', '0' };
+    if (memcmp((etc1_byte*)data, ETC2_SIGNATURE, sizeof(ETC2_SIGNATURE)) == 0) {
+        return true;
+    }
     return etc1_pkm_is_valid((etc1_byte*)data) ? true : false;
 }
 
-
+// MEMO: S3TC判定ではなく DDSファイル判定（ATiTCの可能性もある）
 bool Image::isS3TC(const unsigned char * data, ssize_t dataLen)
 {
 
@@ -625,6 +633,7 @@ bool Image::isS3TC(const unsigned char * data, ssize_t dataLen)
     return true;
 }
 
+// MEMO: ATiTC判定ではなく KTXファイル判定(KTXには他のフォーマットも格納される)
 bool Image::isATITC(const unsigned char *data, ssize_t dataLen)
 {
     ATITCTexHeader *header = (ATITCTexHeader *)data;
@@ -1350,6 +1359,9 @@ namespace
             case PVR3TexturePixelFormat::PVRTC4BPP_RGB:
             case PVR3TexturePixelFormat::PVRTC4BPP_RGBA:
             case PVR3TexturePixelFormat::ETC1:
+            case PVR3TexturePixelFormat::ETC2_RGB:    // for ETC2
+            case PVR3TexturePixelFormat::ETC2_RGBA1:  // for ETC2
+            case PVR3TexturePixelFormat::ETC2_RGBA:   // for ETC2
             case PVR3TexturePixelFormat::RGBA8888:
             case PVR3TexturePixelFormat::RGBA4444:
             case PVR3TexturePixelFormat::RGBA5551:
@@ -1645,6 +1657,13 @@ bool Image::initWithPVRv3Data(const unsigned char * data, ssize_t dataLen)
                 widthBlocks = width / 4;
                 heightBlocks = height / 4;
                 break;
+            case PVR3TexturePixelFormat::ETC2_RGB:    // for ETC2
+            case PVR3TexturePixelFormat::ETC2_RGBA:   // for ETC2
+            case PVR3TexturePixelFormat::ETC2_RGBA1:  // for ETC2
+                blockSize = 4 * 4;                    // Pixel by pixel block size for 4bpp
+                widthBlocks = width / 4;
+                heightBlocks = height / 4;
+                break;
             case PVR3TexturePixelFormat::BGRA8888:
                 if (! Configuration::getInstance()->supportsBGRA8888())
                 {
@@ -1702,7 +1721,11 @@ bool Image::initWithETCData(const unsigned char * data, ssize_t dataLen)
     //check the data
     if (! etc1_pkm_is_valid(header))
     {
-        return  false;
+        // for ETC2
+        static const char ETC2_SIGNATURE[] = { 'P', 'K', 'M', ' ', '2', '0' };
+        if (memcmp((etc1_byte*)header, ETC2_SIGNATURE, sizeof(ETC2_SIGNATURE)) != 0) {
+            return false;
+        }
     }
 
     _width = etc1_pkm_get_width(header);
@@ -1715,9 +1738,25 @@ bool Image::initWithETCData(const unsigned char * data, ssize_t dataLen)
 
     if (Configuration::getInstance()->supportsETC())
     {
-        //old opengl version has no define for GL_ETC1_RGB8_OES, add macro to make compiler happy. 
+        // for ETC2
+        int format = header[6] | header[7];
+        switch(format)
+        {
+            case 1 :
+                _renderFormat = Texture2D::PixelFormat::ETC2_RGB;
+                break;
+            case 2 :
+                _renderFormat = Texture2D::PixelFormat::ETC2_RGBA1;
+                break;
+            case 3 :
+                _renderFormat = Texture2D::PixelFormat::ETC2_RGBA;
+                break;
+            default :
+                _renderFormat = Texture2D::PixelFormat::ETC;
+                break;
+        }
+        //old opengl version has no define for GL_ETC1_RGB8_OES, add macro to make compiler happy.
 #ifdef GL_ETC1_RGB8_OES
-        _renderFormat = Texture2D::PixelFormat::ETC;
         _dataLen = dataLen - ETC_PKM_HEADER_SIZE;
         _data = static_cast<unsigned char*>(malloc(_dataLen * sizeof(unsigned char)));
         memcpy(_data, static_cast<const unsigned char*>(data) + ETC_PKM_HEADER_SIZE, _dataLen);
@@ -1840,7 +1879,12 @@ bool Image::initWithS3TCData(const unsigned char * data, ssize_t dataLen)
     const uint32_t FOURCC_DXT1 = makeFourCC('D', 'X', 'T', '1');
     const uint32_t FOURCC_DXT3 = makeFourCC('D', 'X', 'T', '3');
     const uint32_t FOURCC_DXT5 = makeFourCC('D', 'X', 'T', '5');
-    
+
+    // for ATiTC
+    const uint32_t FOURCC_ATC  = makeFourCC('A', 'T', 'C', ' ');  // RGB   'ATC '  4bpp
+    const uint32_t FOURCC_ATCA = makeFourCC('A', 'T', 'C', 'A');  // RGBA  'ATCA'  8bpp Explicit Alpha
+    const uint32_t FOURCC_ATCI = makeFourCC('A', 'T', 'C', 'I');  // RGBA  'ATCI'  8bpp Interpolated Alpha
+
     /* load the .dds file */
     
     S3TCTexHeader *header = (S3TCTexHeader *)data;
@@ -1858,7 +1902,8 @@ bool Image::initWithS3TCData(const unsigned char * data, ssize_t dataLen)
     int width = _width;
     int height = _height;
     
-    if (Configuration::getInstance()->supportsS3TC())  //compressed data length
+    if (Configuration::getInstance()->supportsS3TC() ||  // compressed data length
+        Configuration::getInstance()->supportsATITC())   // for ATiTC
     {
         _dataLen = dataLen - sizeof(S3TCTexHeader);
         _data = static_cast<unsigned char*>(malloc(_dataLen * sizeof(unsigned char)));
@@ -1878,7 +1923,26 @@ bool Image::initWithS3TCData(const unsigned char * data, ssize_t dataLen)
         }
         _data = static_cast<unsigned char*>(malloc(_dataLen * sizeof(unsigned char)));
     }
-    
+
+    _renderFormat = Texture2D::PixelFormat::RGBA8888;
+
+    // for ATiTC
+    if (Configuration::getInstance()->supportsATITC())
+    {
+        if (FOURCC_ATC == header->ddsd.DUMMYUNIONNAMEN4.ddpfPixelFormat.fourCC)
+        {
+            _renderFormat = Texture2D::PixelFormat::ATC_RGB;
+        }
+        else if (FOURCC_ATCA == header->ddsd.DUMMYUNIONNAMEN4.ddpfPixelFormat.fourCC)
+        {
+            _renderFormat = Texture2D::PixelFormat::ATC_EXPLICIT_ALPHA;
+        }
+        else if (FOURCC_ATCI == header->ddsd.DUMMYUNIONNAMEN4.ddpfPixelFormat.fourCC)
+        {
+            _renderFormat = Texture2D::PixelFormat::ATC_INTERPOLATED_ALPHA;
+        }
+    }
+
     /* if hardware supports s3tc, set pixelformat before loading mipmaps, to support non-mipmapped textures  */
     if (Configuration::getInstance()->supportsS3TC())
     {   //decode texture through hardware
@@ -1895,8 +1959,6 @@ bool Image::initWithS3TCData(const unsigned char * data, ssize_t dataLen)
         {
             _renderFormat = Texture2D::PixelFormat::S3TC_DXT5;
         }
-    } else { //will software decode
-        _renderFormat = Texture2D::PixelFormat::RGBA8888;
     }
     
     /* load the mipmaps */
@@ -1912,7 +1974,8 @@ bool Image::initWithS3TCData(const unsigned char * data, ssize_t dataLen)
         
         int size = ((width+3)/4)*((height+3)/4)*blockSize;
                 
-        if (Configuration::getInstance()->supportsS3TC())
+        if (Configuration::getInstance()->supportsS3TC() ||
+            Configuration::getInstance()->supportsATITC())   // for ATiTC)
         {   //decode texture through hardware
             _mipmaps[i].address = (unsigned char *)_data + encodeOffset;
             _mipmaps[i].len = size;
