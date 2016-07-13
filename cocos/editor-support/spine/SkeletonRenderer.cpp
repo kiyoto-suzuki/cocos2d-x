@@ -100,9 +100,9 @@ SkeletonRenderer::SkeletonRenderer (const std::string& skeletonDataFile, const s
 SkeletonRenderer::~SkeletonRenderer () {
 	if (_ownsSkeletonData) spSkeletonData_dispose(_skeleton->data);
 	if (_atlas) spAtlas_dispose(_atlas);
-	spSkeleton_dispose(_skeleton);
-	_batch->release();
-	FREE(_worldVertices);
+	if (_skeleton) spSkeleton_dispose(_skeleton);
+	if (_batch) _batch->release();
+	if (_worldVertices) FREE(_worldVertices);
 }
 
 void SkeletonRenderer::initWithData (spSkeletonData* skeletonData, bool ownsSkeletonData) {

@@ -120,7 +120,7 @@ SkeletonAnimation::SkeletonAnimation (const std::string& skeletonDataFile, const
 
 SkeletonAnimation::~SkeletonAnimation () {
 	if (_ownsAnimationStateData) spAnimationStateData_dispose(_state->data);
-	spAnimationState_dispose(_state);
+	if (_state) spAnimationState_dispose(_state);
 }
 
 void SkeletonAnimation::update (float deltaTime) {
