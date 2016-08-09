@@ -283,6 +283,11 @@ def _check_python_version():
 
     return True
 
+def _remove_flatbuffers(workpath):
+    flatbuffers_path = os.path.join(workpath, "external", "flatbuffers")
+    if os.path.isdir(flatbuffers_path):
+        shutil.rmtree(flatbuffers_path)
+        print("==> external/flatbuffers removed!")
 
 def main():
     workpath = os.path.dirname(os.path.realpath(__file__))
@@ -310,6 +315,7 @@ def main():
     external_path = os.path.join(workpath, 'external')
     installer = CocosZipInstaller(workpath, os.path.join(workpath, 'external', 'config.json'), os.path.join(workpath, 'external', 'version.json'), "prebuilt_libs_version")
     installer.run(workpath, external_path, opts.remove_downloaded, opts.force_update, opts.download_only)
+    _remove_flatbuffers(workpath)
 
 # -------------- main --------------
 if __name__ == '__main__':
