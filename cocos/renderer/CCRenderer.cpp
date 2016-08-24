@@ -193,6 +193,8 @@ void RenderQueue::restoreRenderState()
 //
 static const int DEFAULT_RENDER_QUEUE = 0;
 
+bool Renderer::BatchRenderEnableVBO = false;
+
 //
 // constructors, destructor, init
 //
@@ -721,6 +723,22 @@ void Renderer::fillVerticesAndIndices(const TrianglesCommand* cmd)
     _filledIndex += cmd->getIndexCount();
 }
 
+/*----------------------------------------------------------------------------------------------
+ * cocos2d デフォルトのバッチ描画処理は新しめの Android(Z4,Z5等）で高負荷を発生させるので修正
+ * 本来 glBufferData(GL_STATIC_DRAW) は、初期化時に１度だけ行う事で高速化を図る関数なので描画
+ * のたびに行ってはいけないはず（現状、頂点バッファオブジェクトを使わないほうがかなり高速）
+----------------------------------------------------------------------------------------------*/
+static void bindVertexBuffer( V3F_C4B_T2F* verts )
+{
+    GL::enableVertexAttribs(GL::VERTEX_ATTRIB_FLAG_POS_COLOR_TEX);
+    // vertices
+    glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(verts[0]), (GLvoid*)&verts->vertices);
+    // colors
+    glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(verts[0]), (GLvoid*)&verts->colors);
+    // tex coords
+    glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_TEX_COORD, 2, GL_FLOAT, GL_FALSE, sizeof(verts[0]), (GLvoid*)&verts->texCoords);
+}
+
 void Renderer::drawBatchedTriangles()
 {
     if(_queuedTriangleCommands.empty())
@@ -740,6 +758,7 @@ void Renderer::drawBatchedTriangles()
     int batchesTotal = 0;
     int prevMaterialID = -1;
     bool firstCommand = true;
+    bool unbind = true;
 
     for(auto it = std::begin(_queuedTriangleCommands); it != std::end(_queuedTriangleCommands); ++it)
     {
@@ -787,71 +806,101 @@ void Renderer::drawBatchedTriangles()
     auto conf = Configuration::getInstance();
     if (conf->supportsShareableVAO() && conf->supportsMapBuffer())
     {
-        //Bind VAO
-        GL::bindVAO(_buffersVAO);
-        //Set VBO data
-        glBindBuffer(GL_ARRAY_BUFFER, _buffersVBO[0]);
+        if( BatchRenderEnableVBO )
+        {
+            //Bind VAO
+            GL::bindVAO(_buffersVAO);
+          
+            //Set VBO data
+            glBindBuffer(GL_ARRAY_BUFFER, _buffersVBO[0]);
 
-        // option 1: subdata
-//        glBufferSubData(GL_ARRAY_BUFFER, sizeof(_quads[0])*start, sizeof(_quads[0]) * n , &_quads[start] );
+            // option 3: orphaning + glMapBuffer
+            // FIXME: in order to work as fast as possible, it must "and the exact same size and usage hints it had before."
+            //  source: https://www.opengl.org/wiki/Buffer_Object_Streaming#Explicit_multiple_buffering
+            // so most probably we won't have any benefit of using it
+            glBufferData(GL_ARRAY_BUFFER, sizeof(_verts[0]) * _filledVertex, nullptr, GL_STATIC_DRAW);
+            void *buf = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+            memcpy(buf, _verts, sizeof(_verts[0]) * _filledVertex);
+            glUnmapBuffer(GL_ARRAY_BUFFER);
 
-        // option 2: data
-//        glBufferData(GL_ARRAY_BUFFER, sizeof(_verts[0]) * _filledVertex, _verts, GL_STATIC_DRAW);
-
-        // option 3: orphaning + glMapBuffer
-        // FIXME: in order to work as fast as possible, it must "and the exact same size and usage hints it had before."
-        //  source: https://www.opengl.org/wiki/Buffer_Object_Streaming#Explicit_multiple_buffering
-        // so most probably we won't have any benefit of using it
-        glBufferData(GL_ARRAY_BUFFER, sizeof(_verts[0]) * _filledVertex, nullptr, GL_STATIC_DRAW);
-        void *buf = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-        memcpy(buf, _verts, sizeof(_verts[0]) * _filledVertex);
-        glUnmapBuffer(GL_ARRAY_BUFFER);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
         
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _buffersVBO[1]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(_indices[0]) * _filledIndex, _indices, GL_STATIC_DRAW);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _buffersVBO[1]);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(_indices[0]) * _filledIndex, _indices, GL_STATIC_DRAW);
+        }
+        else
+        {
+            bindVertexBuffer(_verts);
+            unbind = false;
+        }
     }
     else
     {
         // Client Side Arrays
 #define kQuadSize sizeof(_verts[0])
-        glBindBuffer(GL_ARRAY_BUFFER, _buffersVBO[0]);
 
-        glBufferData(GL_ARRAY_BUFFER, sizeof(_verts[0]) * _filledVertex , _verts, GL_DYNAMIC_DRAW);
+        if( BatchRenderEnableVBO )
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, _buffersVBO[0]);
 
-        GL::enableVertexAttribs(GL::VERTEX_ATTRIB_FLAG_POS_COLOR_TEX);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(_verts[0]) * _filledVertex , _verts, GL_DYNAMIC_DRAW);
 
-        // vertices
-        glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_POSITION, 3, GL_FLOAT, GL_FALSE, kQuadSize, (GLvoid*) offsetof(V3F_C4B_T2F, vertices));
+            GL::enableVertexAttribs(GL::VERTEX_ATTRIB_FLAG_POS_COLOR_TEX);
 
-        // colors
-        glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, kQuadSize, (GLvoid*) offsetof(V3F_C4B_T2F, colors));
+            // vertices
+            glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_POSITION, 3, GL_FLOAT, GL_FALSE, kQuadSize, (GLvoid*) offsetof(V3F_C4B_T2F, vertices));
 
-        // tex coords
-        glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_TEX_COORD, 2, GL_FLOAT, GL_FALSE, kQuadSize, (GLvoid*) offsetof(V3F_C4B_T2F, texCoords));
+            // colors
+            glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, kQuadSize, (GLvoid*) offsetof(V3F_C4B_T2F, colors));
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _buffersVBO[1]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(_indices[0]) * _filledIndex, _indices, GL_STATIC_DRAW);
+            // tex coords
+            glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_TEX_COORD, 2, GL_FLOAT, GL_FALSE, kQuadSize, (GLvoid*) offsetof(V3F_C4B_T2F, texCoords));
+
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _buffersVBO[1]);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(_indices[0]) * _filledIndex, _indices, GL_STATIC_DRAW);
+        }
+        else
+        {
+            bindVertexBuffer(_verts);
+            unbind = false;
+        }
     }
 
     /************** 3: Draw *************/
-    for (int i=0; i<batchesTotal; ++i)
+    if( BatchRenderEnableVBO )
     {
-        CC_ASSERT(_triBatchesToDraw[i].cmd && "Invalid batch");
-        _triBatchesToDraw[i].cmd->useMaterial();
-        glDrawElements(GL_TRIANGLES, (GLsizei) _triBatchesToDraw[i].indicesToDraw, GL_UNSIGNED_SHORT, (GLvoid*) (_triBatchesToDraw[i].offset*sizeof(_indices[0])) );
-        _drawnBatches++;
-        _drawnVertices += _triBatchesToDraw[i].indicesToDraw;
+        for (int i=0; i<batchesTotal; ++i)
+        {
+            CC_ASSERT(_triBatchesToDraw[i].cmd && "Invalid batch");
+            _triBatchesToDraw[i].cmd->useMaterial();
+            glDrawElements(GL_TRIANGLES, (GLsizei) _triBatchesToDraw[i].indicesToDraw, GL_UNSIGNED_SHORT, (GLvoid*) (_triBatchesToDraw[i].offset*sizeof(_indices[0])) );
+            _drawnBatches++;
+            _drawnVertices += _triBatchesToDraw[i].indicesToDraw;
+        }
+    }
+    else
+    {
+        for (int i=0; i<batchesTotal; ++i)
+        {
+            CC_ASSERT(_triBatchesToDraw[i].cmd && "Invalid batch");
+            _triBatchesToDraw[i].cmd->useMaterial();
+            glDrawElements(GL_TRIANGLES, (GLsizei) _triBatchesToDraw[i].indicesToDraw, GL_UNSIGNED_SHORT, _indices + _triBatchesToDraw[i].offset);
+            _drawnBatches++;
+            _drawnVertices += _triBatchesToDraw[i].indicesToDraw;
+        }
     }
 
     /************** 4: Cleanup *************/
     if (Configuration::getInstance()->supportsShareableVAO())
     {
         //Unbind VAO
-        GL::bindVAO(0);
+        if( BatchRenderEnableVBO )
+        {
+            GL::bindVAO(0);
+        }
     }
-    else
+  
+    if( unbind )
     {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
