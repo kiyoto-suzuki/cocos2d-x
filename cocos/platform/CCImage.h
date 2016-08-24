@@ -130,7 +130,7 @@ public:
     * @js NA
     * @lua NA
     */
-    bool initWithImageData(const unsigned char * data, ssize_t dataLen);
+    bool initWithImageData(const unsigned char * data, ssize_t dataLen, bool premultipliedAlphaEnabled = true);
 
     // @warning kFmtRawData only support RGBA8888
     bool initWithRawData(const unsigned char * data, ssize_t dataLen, int width, int height, int bitsPerComponent, bool preMulti = false);
@@ -166,7 +166,7 @@ protected:
     bool decodeWithWIC(const unsigned char *data, ssize_t dataLen);
 #endif
     bool initWithJpgData(const unsigned char *  data, ssize_t dataLen);
-    bool initWithPngData(const unsigned char * data, ssize_t dataLen);
+    bool initWithPngData(const unsigned char * data, ssize_t dataLen, bool premultipliedAlphaEnabled);
     bool initWithTiffData(const unsigned char * data, ssize_t dataLen);
     bool initWithWebpData(const unsigned char * data, ssize_t dataLen);
     bool initWithPVRData(const unsigned char * data, ssize_t dataLen);
