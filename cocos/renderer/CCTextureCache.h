@@ -145,6 +145,8 @@ public:
     Texture2D* addImage(Image *image, const std::string &key);
     CC_DEPRECATED_ATTRIBUTE Texture2D* addUIImage(Image *image, const std::string& key) { return addImage(image,key); }
 
+    Texture2D* addImageWithReloadPath(Image *image, const std::string &key, const std::string& reloadPath);
+  
     /** Returns an already created texture. Returns nil if the texture doesn't exist.
     @param key It's the related/absolute path of the file image.
     @since v0.99.5
