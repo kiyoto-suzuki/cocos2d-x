@@ -275,6 +275,9 @@ protected:
 #if CC_ENABLE_CACHE_TEXTURE_DATA
     EventListenerCustom* _cacheTextureListener;
 #endif
+  
+public:
+    static bool BatchRenderEnableVBO;
 };
 
 NS_CC_END

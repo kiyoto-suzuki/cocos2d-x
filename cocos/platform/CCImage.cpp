@@ -515,7 +515,7 @@ bool Image::initWithImageFileThreadSafe(const std::string& fullpath)
     return ret;
 }
 
-bool Image::initWithImageData(const unsigned char * data, ssize_t dataLen)
+bool Image::initWithImageData(const unsigned char * data, ssize_t dataLen, bool premultipliedAlphaEnabled)
 {
     bool ret = false;
     
@@ -546,7 +546,7 @@ bool Image::initWithImageData(const unsigned char * data, ssize_t dataLen)
         switch (_fileType)
         {
         case Format::PNG:
-            ret = initWithPngData(unpackedData, unpackedLen);
+            ret = initWithPngData(unpackedData, unpackedLen, premultipliedAlphaEnabled);
             break;
         case Format::JPG:
             ret = initWithJpgData(unpackedData, unpackedLen);
@@ -1003,7 +1003,7 @@ bool Image::initWithJpgData(const unsigned char * data, ssize_t dataLen)
 #endif // CC_USE_JPEG
 }
 
-bool Image::initWithPngData(const unsigned char * data, ssize_t dataLen)
+bool Image::initWithPngData(const unsigned char * data, ssize_t dataLen, bool premultipliedAlphaEnabled)
 {
 #if CC_USE_WIC
     return decodeWithWIC(data, dataLen);
@@ -1132,7 +1132,7 @@ bool Image::initWithPngData(const unsigned char * data, ssize_t dataLen)
         png_read_end(png_ptr, nullptr);
 
         // premultiplied alpha for RGBA8888
-        if (PNG_PREMULTIPLIED_ALPHA_ENABLED && color_type == PNG_COLOR_TYPE_RGB_ALPHA)
+        if (premultipliedAlphaEnabled && PNG_PREMULTIPLIED_ALPHA_ENABLED && color_type == PNG_COLOR_TYPE_RGB_ALPHA)
         {
             premultipliedAlpha();
         }

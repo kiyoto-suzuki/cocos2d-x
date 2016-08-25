@@ -425,6 +425,11 @@ void TextureCache::parseNinePatchImage(cocos2d::Image *image, cocos2d::Texture2D
 
 Texture2D* TextureCache::addImage(Image *image, const std::string &key)
 {
+  return addImageWithReloadPath(image, key, std::string());
+}
+
+Texture2D* TextureCache::addImageWithReloadPath(Image *image, const std::string &key, const std::string& reloadPath)
+{
     CCASSERT(image != nullptr, "TextureCache: image MUST not be nil");
     CCASSERT(image->getData() != nullptr, "TextureCache: image MUST not be nil");
 
@@ -457,7 +462,16 @@ Texture2D* TextureCache::addImage(Image *image, const std::string &key)
     } while (0);
 
 #if CC_ENABLE_CACHE_TEXTURE_DATA
-    VolatileTextureMgr::addImage(texture, image);
+    std::string fullpath = FileUtils::getInstance()->fullPathForFilename(reloadPath);
+    if (fullpath.length() > 0)
+    {
+        // cache the texture file name
+        VolatileTextureMgr::addImageTexture(texture, fullpath);
+    }
+    else
+    {
+        VolatileTextureMgr::addImage(texture, image);
+    }
 #endif
 
     return texture;
