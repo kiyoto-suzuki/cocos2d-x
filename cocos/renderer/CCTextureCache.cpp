@@ -425,10 +425,10 @@ void TextureCache::parseNinePatchImage(cocos2d::Image *image, cocos2d::Texture2D
 
 Texture2D* TextureCache::addImage(Image *image, const std::string &key)
 {
-  return addImageWithReloadPath(image, key, std::string());
+    return addImageWithReloadPath(image, key, std::string(), nullptr);
 }
 
-Texture2D* TextureCache::addImageWithReloadPath(Image *image, const std::string &key, const std::string& reloadPath)
+Texture2D* TextureCache::addImageWithReloadPath(Image *image, const std::string &key, const std::string& reloadPath, ReloadFunction reloadFunction)
 {
     CCASSERT(image != nullptr, "TextureCache: image MUST not be nil");
     CCASSERT(image->getData() != nullptr, "TextureCache: image MUST not be nil");
@@ -463,10 +463,14 @@ Texture2D* TextureCache::addImageWithReloadPath(Image *image, const std::string 
 
 #if CC_ENABLE_CACHE_TEXTURE_DATA
     std::string fullpath = FileUtils::getInstance()->fullPathForFilename(reloadPath);
-    if (fullpath.length() > 0)
+    if( reloadFunction != nullptr )
+    {
+        VolatileTextureMgr::addImageTexture(texture, fullpath, reloadFunction);
+    }
+    else if (fullpath.length() > 0)
     {
         // cache the texture file name
-        VolatileTextureMgr::addImageTexture(texture, fullpath);
+        VolatileTextureMgr::addImageTexture(texture, fullpath, nullptr);
     }
     else
     {
@@ -701,6 +705,7 @@ VolatileTexture::VolatileTexture(Texture2D *t)
 , _text("")
 , _uiImage(nullptr)
 , _hasMipmaps(false)
+,_reloadFunction(nullptr)
 {
     _texParams.minFilter = GL_LINEAR;
     _texParams.magFilter = GL_LINEAR;
@@ -713,7 +718,7 @@ VolatileTexture::~VolatileTexture()
     CC_SAFE_RELEASE(_uiImage);
 }
 
-void VolatileTextureMgr::addImageTexture(Texture2D *tt, const std::string& imageFileName)
+void VolatileTextureMgr::addImageTexture(Texture2D *tt, const std::string& imageFileName, TextureCache::ReloadFunction reloadFunction)
 {
     if (_isReloading)
     {
@@ -725,6 +730,7 @@ void VolatileTextureMgr::addImageTexture(Texture2D *tt, const std::string& image
     vt->_cashedImageType = VolatileTexture::kImageFile;
     vt->_fileName = imageFileName;
     vt->_pixelFormat = tt->getPixelFormat();
+    vt->_reloadFunction = reloadFunction;
 }
 
 void VolatileTextureMgr::addImage(Texture2D *tt, Image *image)
@@ -844,19 +850,28 @@ void VolatileTextureMgr::reloadAllTextures()
         {
         case VolatileTexture::kImageFile:
         {
-            Image* image = new (std::nothrow) Image();
+            Image* image = nullptr;
+            if( vt->_reloadFunction != nullptr )
+            {
+                image = vt->_reloadFunction(vt->_texture, vt->_fileName);
+            }
+            else
+            {
+                image = new (std::nothrow) Image();
+                Data data = FileUtils::getInstance()->getDataFromFile(vt->_fileName);
+                if( !image->initWithImageData(data.getBytes(), data.getSize()) ) {
+                    CC_SAFE_RELEASE_NULL(image);
+                }
+            }
 
-            Data data = FileUtils::getInstance()->getDataFromFile(vt->_fileName);
-
-            if (image && image->initWithImageData(data.getBytes(), data.getSize()))
+            if (image != nullptr)
             {
                 Texture2D::PixelFormat oldPixelFormat = Texture2D::getDefaultAlphaPixelFormat();
                 Texture2D::setDefaultAlphaPixelFormat(vt->_pixelFormat);
                 vt->_texture->initWithImage(image);
                 Texture2D::setDefaultAlphaPixelFormat(oldPixelFormat);
+                CC_SAFE_RELEASE(image);
             }
-
-            CC_SAFE_RELEASE(image);
         }
         break;
         case VolatileTexture::kImageData:

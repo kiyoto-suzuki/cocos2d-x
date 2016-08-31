@@ -145,7 +145,8 @@ public:
     Texture2D* addImage(Image *image, const std::string &key);
     CC_DEPRECATED_ATTRIBUTE Texture2D* addUIImage(Image *image, const std::string& key) { return addImage(image,key); }
 
-    Texture2D* addImageWithReloadPath(Image *image, const std::string &key, const std::string& reloadPath);
+    typedef std::function<Image*(cocos2d::Texture2D*, const std::string&)> ReloadFunction;
+    Texture2D* addImageWithReloadPath(Image *image, const std::string &key, const std::string& reloadPath, ReloadFunction reloadFunction = nullptr);
   
     /** Returns an already created texture. Returns nil if the texture doesn't exist.
     @param key It's the related/absolute path of the file image.
@@ -287,12 +288,13 @@ protected:
     Texture2D::TexParams      _texParams;
     std::string               _text;
     FontDefinition            _fontDefinition;
+    TextureCache::ReloadFunction _reloadFunction;
 };
 
 class CC_DLL VolatileTextureMgr
 {
 public:
-    static void addImageTexture(Texture2D *tt, const std::string& imageFileName);
+    static void addImageTexture(Texture2D *tt, const std::string& imageFileName, TextureCache::ReloadFunction reloadFunction = nullptr);
     static void addStringTexture(Texture2D *tt, const char* text, const FontDefinition& fontDefinition);
     static void addDataTexture(Texture2D *tt, void* data, int dataLen, Texture2D::PixelFormat pixelFormat, const Size& contentSize);
     static void addImage(Texture2D *tt, Image *image);
