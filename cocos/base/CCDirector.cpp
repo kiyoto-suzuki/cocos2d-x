@@ -83,6 +83,8 @@ NS_CC_BEGIN
 // singleton stuff
 static DisplayLinkDirector *s_SharedDirector = nullptr;
 
+static bool s_deviceIsQualcomm = false;
+
 #define kDefaultFPS        60  // 60 frames per second
 extern const char* cocos2dVersion(void);
 
@@ -314,6 +316,48 @@ void Director::drawScene()
 
     _eventDispatcher->dispatchEvent(_eventAfterDraw);
 
+    // clear framebuffer alpha for qualcomm adreno320 & android 4.2.2.
+    if( s_deviceIsQualcomm )
+    {
+        auto visibleSize = getVisibleSize();
+        float w = visibleSize.width;
+        float h = visibleSize.height;
+    
+        cocos2d::Vec3 position[] = {{0.0f, 0.0f, 0.0f}, {w, 0.0f, 0.0f}, {0.0f, h, 0.0f}, {w, h, 0.0f}};
+        cocos2d::Color4B vtxcolor[] = {{255, 255, 255, 255}, {255, 255, 255, 255}, {255, 255, 255, 255}, {255, 255, 255, 255}};
+    
+        auto programState = GLProgramState::getOrCreateWithGLProgramName(GLProgram::SHADER_NAME_POSITION_COLOR_NO_MVP);
+        programState->getGLProgram()->use();
+        programState->apply(cocos2d::Mat4::IDENTITY);
+        CHECK_GL_ERROR_DEBUG();
+      
+        GLboolean blendEnable = glIsEnabled(GL_BLEND);
+        GLboolean depthEnable = false;
+        glGetBooleanv(GL_DEPTH_WRITEMASK, &depthEnable);
+      
+        glDisable(GL_BLEND);
+        // glDisable(GL_CULL_FACE);
+        glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_TRUE);
+
+        Director::getInstance()->setDepthTest(false);
+        glDepthMask(false);
+    
+        GL::enableVertexAttribs(GL::VERTEX_ATTRIB_FLAG_POSITION|GL::VERTEX_ATTRIB_FLAG_COLOR);
+        glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_POSITION, 3, GL_FLOAT, GL_FALSE, 0, position);
+        glVertexAttribPointer(GLProgram::VERTEX_ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, vtxcolor);
+    
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        CHECK_GL_ERROR_DEBUG();
+    
+        if( blendEnable ) {
+            glEnable(GL_BLEND);
+        }
+        if( depthEnable ) {
+          glDepthMask(true);
+        }
+        glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
+    }
+  
     popMatrix(MATRIX_STACK_TYPE::MATRIX_STACK_MODELVIEW);
 
     _totalFrames++;
@@ -397,6 +441,10 @@ void Director::setOpenGLView(GLView *openGLView)
         
         _defaultFBO = experimental::FrameBuffer::getOrCreateDefaultFBO(_openGLView);
         _defaultFBO->retain();
+
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
+        s_deviceIsQualcomm = Configuration::getInstance()->checkForGLExtension("GL_QCOM");
+#endif
     }
 }
 
