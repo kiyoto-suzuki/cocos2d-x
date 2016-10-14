@@ -371,7 +371,7 @@ Texture2D * TextureCache::addImage(const std::string &path)
 
             texture = new (std::nothrow) Texture2D();
 
-            if (texture && texture->initWithImage(image))
+            if (texture && texture->initWithImage(image, Texture2D::PixelFormat::AUTO))
             {
 #if CC_ENABLE_CACHE_TEXTURE_DATA
                 // cache the texture file name
