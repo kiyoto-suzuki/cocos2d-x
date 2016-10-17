@@ -772,6 +772,12 @@ bool Widget::isSwallowTouches()const
 
 bool Widget::onTouchBegan(Touch *touch, Event *unusedEvent)
 {
+    {
+        // modify : disable multi touch
+        if (touch->getID() != 0) {
+            return false;
+        }
+    }
     _hitted = false;
     if (isVisible() && isEnabled() && isAncestorsEnabled() && isAncestorsVisible(this) )
     {
