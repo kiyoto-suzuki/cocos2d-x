@@ -1233,7 +1233,7 @@ void Director::showStats()
     
     if (_displayStats && _FPSLabel && _drawnBatchesLabel && _drawnVerticesLabel)
     {
-        char buffer[30];
+        char buffer[128];
 
         float dt = _deltaTime * FPS_FILTER + (1-FPS_FILTER) * prevDeltaTime;
         prevDeltaTime = dt;
