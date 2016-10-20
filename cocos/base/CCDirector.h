@@ -448,6 +448,11 @@ public:
     /* Gets delta time since last tick to main loop. */
 	float getDeltaTime() const;
     
+  
+    void setDeltaTimeLimit(float limit) { _deltaTimeLimit = limit; }
+
+    float getDeltaTimeLimit() const { return _deltaTimeLimit; }
+  
     /**
      *  Gets Frame Rate.
      * @js NA
@@ -546,8 +551,9 @@ protected:
     EventCustom *_eventProjectionChanged, *_eventAfterDraw, *_eventAfterVisit, *_eventBeforeUpdate, *_eventAfterUpdate, *_eventResetDirector;
         
     /* delta time since last tick to main loop */
-	float _deltaTime;
-    
+    float _deltaTime;
+    float _deltaTimeLimit;
+  
     /* The _openGLView, where everything is rendered, GLView is a abstract class,cocos2d-x provide GLViewImpl
      which inherit from it as default renderer context,you can have your own by inherit from it*/
     GLView *_openGLView;
@@ -591,7 +597,10 @@ protected:
     
     /* last time the main loop was updated */
     std::chrono::steady_clock::time_point _lastUpdate;
-
+  
+    float _usingCpuTime; /* cpu parformance */
+    float _usingGpuTime; /* gpu parformance */
+  
     /* whether or not the next delta time will be zero */
     bool _nextDeltaTimeZero;
     
