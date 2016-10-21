@@ -131,6 +131,7 @@ bool Director::init(void)
     _totalFrames = 0;
     _lastUpdate = std::chrono::steady_clock::now();
     _secondsPerFrame = 1.0f;
+    _deltaTimeLimit = 0.0f;
 
     // paused ?
     _paused = false;
@@ -362,12 +363,19 @@ void Director::drawScene()
 
     _totalFrames++;
 
+    auto cpuTime = std::chrono::steady_clock::now(); // bofore swapBuffers
+  
     // swap buffers
     if (_openGLView)
     {
         _openGLView->swapBuffers();
     }
 
+    auto gpuTime = std::chrono::steady_clock::now(); // after swapBuffers
+
+    _usingCpuTime = std::chrono::duration_cast<std::chrono::microseconds>(cpuTime - _lastUpdate).count() / 1000000.0f;
+    _usingGpuTime = std::chrono::duration_cast<std::chrono::microseconds>(gpuTime - _lastUpdate).count() / 1000000.0f;
+  
     if (_displayStats)
     {
         calculateMPF();
@@ -388,6 +396,13 @@ void Director::calculateDeltaTime()
     {
         _deltaTime = std::chrono::duration_cast<std::chrono::microseconds>(now - _lastUpdate).count() / 1000000.0f;
         _deltaTime = MAX(0, _deltaTime);
+        if( _deltaTimeLimit > 0.0f )
+        {
+            if( _deltaTime > _deltaTimeLimit )
+            {
+              _deltaTime = _deltaTimeLimit;
+            }
+        }
     }
 
 #if COCOS2D_DEBUG
@@ -1218,7 +1233,7 @@ void Director::showStats()
     
     if (_displayStats && _FPSLabel && _drawnBatchesLabel && _drawnVerticesLabel)
     {
-        char buffer[30];
+        char buffer[128];
 
         float dt = _deltaTime * FPS_FILTER + (1-FPS_FILTER) * prevDeltaTime;
         prevDeltaTime = dt;
@@ -1229,7 +1244,8 @@ void Director::showStats()
         // to make the FPS stable
         if (_accumDt > CC_DIRECTOR_STATS_INTERVAL)
         {
-            sprintf(buffer, "%.1f / %.3f", _frameRate, _secondsPerFrame);
+            sprintf(buffer, "%.1f / %.3f  CPU:%.1f GPU:%.1f",
+                    _frameRate, _secondsPerFrame, 1.0f / _usingCpuTime, 1.0f / _usingGpuTime);
             _FPSLabel->setString(buffer);
             _accumDt = 0;
         }
