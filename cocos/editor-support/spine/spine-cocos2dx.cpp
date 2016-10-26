@@ -34,8 +34,14 @@
 
 USING_NS_CC;
 
+namespace spine {
+
+// SHOULD implement this function!
+extern Texture2D* loadTextureFromCache(const char* path);
+}
+
 void _spAtlasPage_createTexture (spAtlasPage* self, const char* path) {
-	Texture2D* texture = Director::getInstance()->getTextureCache()->addImage(path);
+	Texture2D* texture = spine::loadTextureFromCache(path);
 	texture->retain();
 	self->rendererObject = texture;
 	self->width = texture->getPixelsWide();
