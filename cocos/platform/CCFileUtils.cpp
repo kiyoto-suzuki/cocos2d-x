@@ -43,6 +43,44 @@ THE SOFTWARE.
 
 NS_CC_BEGIN
 
+SpinRWLock::SpinRWLock(): _state({false, 0}) {}
+
+void SpinRWLock::readLock() {
+  State newState {false, 0}, oldState = _state.load(std::memory_order_acquire);
+  do {
+    oldState.writeFlag = false; // if writing, then wait
+    newState.readCount = oldState.readCount + 1;
+  } while (!_state.compare_exchange_weak(oldState, newState, std::memory_order_acquire, std::memory_order_relaxed));
+}
+
+void SpinRWLock::readUnLock() {
+  State newState, oldState = _state.load(std::memory_order_acquire);
+  do {
+    newState = oldState;
+    --newState.readCount;
+  } while (!_state.compare_exchange_weak(oldState, newState, std::memory_order_release, std::memory_order_relaxed));
+}
+
+void SpinRWLock::writeLock() {
+  State newState {true, 0}, oldState = _state.load(std::memory_order_acquire);
+  // set writeFlag first to hold off incoming readers
+  do {
+    newState.readCount = oldState.readCount;
+    oldState.writeFlag = false; // if writing, then wait
+  } while (!_state.compare_exchange_weak(oldState, newState, std::memory_order_acquire, std::memory_order_relaxed));
+  // wait for all ongoing readers
+  do {
+    newState = _state.load(std::memory_order_acquire);
+  } while (newState.readCount);
+}
+
+void SpinRWLock::writeUnlock() {
+  State newState {false, 0}, oldState = _state.load(std::memory_order_acquire);
+  do {
+    newState.readCount = oldState.readCount;
+  } while (!_state.compare_exchange_weak(oldState, newState, std::memory_order_release, std::memory_order_relaxed));
+}
+
 // Implement DictMaker
 
 #if (CC_TARGET_PLATFORM != CC_PLATFORM_IOS) && (CC_TARGET_PLATFORM != CC_PLATFORM_MAC)
@@ -607,7 +645,9 @@ bool FileUtils::init()
 
 void FileUtils::purgeCachedEntries()
 {
+    _cacheLock.writeLock();
     _fullPathCache.clear();
+    _cacheLock.writeUnlock();
 }
 
 std::string FileUtils::getStringFromFile(const std::string& filename)
@@ -764,8 +804,6 @@ std::string FileUtils::getPathForFilename(const std::string& filename, const std
 
 std::string FileUtils::fullPathForFilename(const std::string &filename) const
 {
-    static std::mutex mutex;
-    std::lock_guard<std::mutex> lock(mutex);
     if (filename.empty())
     {
         return "";
@@ -777,11 +815,15 @@ std::string FileUtils::fullPathForFilename(const std::string &filename) const
     }
 
     // Already Cached ?
+    _cacheLock.readLock();
     auto cacheIter = _fullPathCache.find(filename);
     if(cacheIter != _fullPathCache.end())
     {
-        return cacheIter->second;
+        auto ret = cacheIter->second;
+        _cacheLock.readUnLock();
+        return ret;
     }
+    _cacheLock.readUnLock();
 
     // Get the new file name.
     const std::string newFilename( getNewFilename(filename) );
@@ -797,7 +839,9 @@ std::string FileUtils::fullPathForFilename(const std::string &filename) const
             if (!fullpath.empty())
             {
                 // Using the filename passed in as key.
-                _fullPathCache.insert(std::make_pair(filename, fullpath));
+                _cacheLock.writeLock();
+                _fullPathCache.emplace(filename, fullpath);
+                _cacheLock.writeUnlock();
                 return fullpath;
             }
 
@@ -820,7 +864,9 @@ std::string FileUtils::fullPathFromRelativeFile(const std::string &filename, con
 void FileUtils::setSearchResolutionsOrder(const std::vector<std::string>& searchResolutionsOrder)
 {
     bool existDefault = false;
+    _cacheLock.writeLock();
     _fullPathCache.clear();
+    _cacheLock.writeUnlock();
     _searchResolutionsOrderArray.clear();
     for(const auto& iter : searchResolutionsOrder)
     {
@@ -881,7 +927,9 @@ void FileUtils::setSearchPaths(const std::vector<std::string>& searchPaths)
 {
     bool existDefaultRootPath = false;
 
+    _cacheLock.writeLock();
     _fullPathCache.clear();
+    _cacheLock.writeUnlock();
     _searchPathArray.clear();
     for (const auto& iter : searchPaths)
     {
@@ -931,7 +979,9 @@ void FileUtils::addSearchPath(const std::string &searchpath,const bool front)
 
 void FileUtils::setFilenameLookupDictionary(const ValueMap& filenameLookupDict)
 {
+    _cacheLock.writeLock();
     _fullPathCache.clear();
+    _cacheLock.writeUnlock();
     _filenameLookupDict = filenameLookupDict;
 }
 
@@ -1002,11 +1052,15 @@ bool FileUtils::isDirectoryExist(const std::string& dirPath) const
     }
 
     // Already Cached ?
+    _cacheLock.readLock();
     auto cacheIter = _fullPathCache.find(dirPath);
     if( cacheIter != _fullPathCache.end() )
     {
-        return isDirectoryExistInternal(cacheIter->second);
+        auto cachedPath = cacheIter->second;
+        _cacheLock.readUnLock();
+        return isDirectoryExistInternal(cachedPath);
     }
+    _cacheLock.readUnLock();
 
     std::string fullpath;
     for (const auto& searchIt : _searchPathArray)
@@ -1017,7 +1071,9 @@ bool FileUtils::isDirectoryExist(const std::string& dirPath) const
             fullpath = fullPathForFilename(searchIt + dirPath + resolutionIt);
             if (isDirectoryExistInternal(fullpath))
             {
-                _fullPathCache.insert(std::make_pair(dirPath, fullpath));
+                _cacheLock.writeLock();
+                _fullPathCache.emplace(dirPath, fullpath);
+                _cacheLock.writeUnlock();
                 return true;
             }
         }
