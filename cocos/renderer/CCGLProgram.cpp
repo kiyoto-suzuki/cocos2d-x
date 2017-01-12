@@ -166,10 +166,10 @@ GLProgram* GLProgram::createWithByteArrays(const GLchar* vShaderByteArray, const
     return createWithByteArrays(vShaderByteArray, fShaderByteArray, EMPTY_DEFINE);
 }
 
-GLProgram* GLProgram::createWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const std::string& compileTimeDefines)
+GLProgram* GLProgram::createWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const std::string& compileTimeDefines, const GLchar* extensions)
 {
     auto ret = new (std::nothrow) GLProgram();
-    if(ret && ret->initWithByteArrays(vShaderByteArray, fShaderByteArray, compileTimeDefines)) {
+    if(ret && ret->initWithByteArrays(vShaderByteArray, fShaderByteArray, compileTimeDefines, extensions)) {
         ret->link();
         ret->updateUniforms();
         ret->autorelease();
@@ -180,6 +180,11 @@ GLProgram* GLProgram::createWithByteArrays(const GLchar* vShaderByteArray, const
     return nullptr;
 }
 
+GLProgram* GLProgram::createWithByteArraysExtensions(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const GLchar* extensions)
+{
+    std::string compileTimeDefines;
+    return createWithByteArrays(vShaderByteArray, fShaderByteArray, compileTimeDefines, extensions);
+}
 
 GLProgram* GLProgram::createWithFilenames(const std::string& vShaderFilename, const std::string& fShaderFilename)
 {
@@ -234,7 +239,7 @@ bool GLProgram::initWithByteArrays(const GLchar* vShaderByteArray, const GLchar*
     return initWithByteArrays(vShaderByteArray, fShaderByteArray, EMPTY_DEFINE);
 }
 
-bool GLProgram::initWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const std::string& compileTimeDefines)
+bool GLProgram::initWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const std::string& compileTimeDefines, const GLchar* extensions)
 {
     _program = glCreateProgram();
     CHECK_GL_ERROR_DEBUG();
@@ -248,7 +253,7 @@ bool GLProgram::initWithByteArrays(const GLchar* vShaderByteArray, const GLchar*
 
     if (vShaderByteArray)
     {
-        if (!compileShader(&_vertShader, GL_VERTEX_SHADER, vShaderByteArray, replacedDefines))
+        if (!compileShader(&_vertShader, GL_VERTEX_SHADER, vShaderByteArray, replacedDefines, extensions))
         {
             CCLOG("cocos2d: ERROR: Failed to compile vertex shader");
             return false;
@@ -258,7 +263,7 @@ bool GLProgram::initWithByteArrays(const GLchar* vShaderByteArray, const GLchar*
     // Create and compile fragment shader
     if (fShaderByteArray)
     {
-        if (!compileShader(&_fragShader, GL_FRAGMENT_SHADER, fShaderByteArray, replacedDefines))
+        if (!compileShader(&_fragShader, GL_FRAGMENT_SHADER, fShaderByteArray, replacedDefines, extensions))
         {
             CCLOG("cocos2d: ERROR: Failed to compile fragment shader");
             return false;
@@ -449,6 +454,11 @@ bool GLProgram::compileShader(GLuint * shader, GLenum type, const GLchar* source
 
 bool GLProgram::compileShader(GLuint* shader, GLenum type, const GLchar* source, const std::string& convertedDefines)
 {
+    return compileShader(shader, type, source, convertedDefines, nullptr);
+}
+
+bool GLProgram::compileShader(GLuint * shader, GLenum type, const GLchar* source, const std::string& convertedDefines, const GLchar* extensions)
+{
     GLint status;
 
     if (!source)
@@ -456,7 +466,13 @@ bool GLProgram::compileShader(GLuint* shader, GLenum type, const GLchar* source,
         return false;
     }
 
+    const char* defaultExtensions = "";
+    if (extensions == nullptr) {
+      extensions = defaultExtensions;
+    }
+
     const GLchar *sources[] = {
+        extensions, "\n", // extension after tokens must not be allowed.
 #if CC_TARGET_PLATFORM == CC_PLATFORM_WINRT
         (type == GL_VERTEX_SHADER ? "precision mediump float;\n precision mediump int;\n" : "precision mediump float;\n precision mediump int;\n"),
 #elif (CC_TARGET_PLATFORM != CC_PLATFORM_WIN32 && CC_TARGET_PLATFORM != CC_PLATFORM_LINUX && CC_TARGET_PLATFORM != CC_PLATFORM_MAC)

@@ -349,8 +349,10 @@ public:
      */
     static GLProgram* createWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray);
     bool initWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray);
-    static GLProgram* createWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const std::string& compileTimeDefines);
-    bool initWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const std::string& compileTimeDefines);
+    static GLProgram* createWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const std::string& compileTimeDefines, const GLchar* extensions = nullptr);
+    bool initWithByteArrays(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const std::string& compileTimeDefines, const GLchar* extensions = nullptr);
+
+    static GLProgram* createWithByteArraysExtensions(const GLchar* vShaderByteArray, const GLchar* fShaderByteArray, const GLchar* extensions);
 
     /**
     @}
@@ -526,6 +528,7 @@ protected:
     /**Parse user defined uniform automatically.*/
     void parseUniforms();
     /**Compile the shader sources.*/
+    bool compileShader(GLuint * shader, GLenum type, const GLchar* source, const std::string& convertedDefines, const GLchar* extensions);
     bool compileShader(GLuint * shader, GLenum type, const GLchar* source, const std::string& convertedDefines);
     bool compileShader(GLuint * shader, GLenum type, const GLchar* source);
     void clearShader();
