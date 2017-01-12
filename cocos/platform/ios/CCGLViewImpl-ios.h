@@ -75,6 +75,9 @@ public:
     virtual void swapBuffers() override;
     virtual void setIMEKeyboardState(bool bOpen) override;
 
+    // UIScreen mainScreen naviveBounds
+    virtual Size nativeBounds() const override;
+  
 protected:
     GLViewImpl();
     virtual ~GLViewImpl();

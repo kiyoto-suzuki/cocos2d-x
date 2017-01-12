@@ -168,6 +168,13 @@ bool GLViewImpl::initWithFullScreen(const std::string& viewName)
     return initWithRect(viewName, r, 1);
 }
 
+// UIScreen mainScreen naviveBounds
+Size GLViewImpl::nativeBounds() const
+{
+    CGRect nativeBounds = [[UIScreen mainScreen] nativeBounds];
+    return Size(nativeBounds.size.width, nativeBounds.size.height);
+}
+
 bool GLViewImpl::isOpenGLReady()
 {
     return _eaglview != nullptr;

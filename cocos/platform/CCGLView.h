@@ -160,6 +160,12 @@ public:
     virtual void pollEvents();
 
     /**
+     * iOS : UIScreen mainScreen naviveBounds
+     * Android : getFrameSize()
+     */
+    virtual Size nativeBounds() const { return getFrameSize(); }
+
+    /**
      * Get the frame size of EGL view.
      * In general, it returns the screen size since the EGL view is a fullscreen view.
      *
