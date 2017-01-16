@@ -163,7 +163,10 @@ public:
      * iOS : UIScreen mainScreen naviveBounds
      * Android : getFrameSize()
      */
-    virtual Size nativeBounds() const { return getFrameSize(); }
+    virtual Size nativeBounds() const {
+      auto size = getFrameSize();
+      return Size(size.height, size.width);
+    }
 
     /**
      * Get the frame size of EGL view.
