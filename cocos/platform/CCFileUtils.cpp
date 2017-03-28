@@ -638,8 +638,12 @@ bool FileUtils::writeDataToFile(const Data& data, const std::string& fullPath)
 
 bool FileUtils::init()
 {
+    _searchPathLock.writeLock();
     _searchPathArray.push_back(_defaultResRootPath);
+    _searchPathLock.writeUnlock();
+    _searchResolutionsOrderLock.writeLock();
     _searchResolutionsOrderArray.push_back("");
+    _searchResolutionsOrderLock.writeUnlock();
     return true;
 }
 
@@ -830,9 +834,15 @@ std::string FileUtils::fullPathForFilename(const std::string &filename) const
 
     std::string fullpath;
 
-    for (const auto& searchIt : _searchPathArray)
+    _searchPathLock.readLock();
+    std::vector<std::string> searchPathArray = _searchPathArray;
+    _searchPathLock.readUnLock();
+    _searchResolutionsOrderLock.readLock();
+    std::vector<std::string> searchResolutionsOrderArray = _searchResolutionsOrderArray;
+    _searchResolutionsOrderLock.readUnLock();
+    for (const auto& searchIt : searchPathArray)
     {
-        for (const auto& resolutionIt : _searchResolutionsOrderArray)
+        for (const auto& resolutionIt : searchResolutionsOrderArray)
         {
             fullpath = this->getPathForFilename(newFilename, resolutionIt, searchIt);
 
@@ -867,7 +877,9 @@ void FileUtils::setSearchResolutionsOrder(const std::vector<std::string>& search
     _cacheLock.writeLock();
     _fullPathCache.clear();
     _cacheLock.writeUnlock();
+    _searchResolutionsOrderLock.writeLock();
     _searchResolutionsOrderArray.clear();
+    _searchResolutionsOrderLock.writeUnlock();
     for(const auto& iter : searchResolutionsOrder)
     {
         std::string resolutionDirectory = iter;
@@ -881,12 +893,16 @@ void FileUtils::setSearchResolutionsOrder(const std::vector<std::string>& search
             resolutionDirectory += "/";
         }
 
+        _searchResolutionsOrderLock.writeLock();
         _searchResolutionsOrderArray.push_back(resolutionDirectory);
+        _searchResolutionsOrderLock.writeUnlock();
     }
 
     if (!existDefault)
     {
+        _searchResolutionsOrderLock.writeLock();
         _searchResolutionsOrderArray.push_back("");
+        _searchResolutionsOrderLock.writeUnlock();
     }
 }
 
@@ -896,11 +912,13 @@ void FileUtils::addSearchResolutionsOrder(const std::string &order,const bool fr
     if (!resOrder.empty() && resOrder[resOrder.length()-1] != '/')
         resOrder.append("/");
 
+    _searchResolutionsOrderLock.writeLock();
     if (front) {
         _searchResolutionsOrderArray.insert(_searchResolutionsOrderArray.begin(), resOrder);
     } else {
         _searchResolutionsOrderArray.push_back(resOrder);
     }
+    _searchResolutionsOrderLock.writeUnlock();
 }
 
 const std::vector<std::string>& FileUtils::getSearchResolutionsOrder() const
@@ -930,7 +948,9 @@ void FileUtils::setSearchPaths(const std::vector<std::string>& searchPaths)
     _cacheLock.writeLock();
     _fullPathCache.clear();
     _cacheLock.writeUnlock();
+    _searchPathLock.writeLock();
     _searchPathArray.clear();
+    _searchPathLock.writeUnlock();
     for (const auto& iter : searchPaths)
     {
         std::string prefix;
@@ -949,13 +969,17 @@ void FileUtils::setSearchPaths(const std::vector<std::string>& searchPaths)
         {
             existDefaultRootPath = true;
         }
+        _searchPathLock.writeLock();
         _searchPathArray.push_back(path);
+        _searchPathLock.writeUnlock();
     }
 
     if (!existDefaultRootPath)
     {
         //CCLOG("Default root path doesn't exist, adding it.");
+        _searchPathLock.writeLock();
         _searchPathArray.push_back(_defaultResRootPath);
+        _searchPathLock.writeUnlock();
     }
 }
 
@@ -970,11 +994,13 @@ void FileUtils::addSearchPath(const std::string &searchpath,const bool front)
     {
         path += "/";
     }
+    _searchPathLock.writeLock();
     if (front) {
         _searchPathArray.insert(_searchPathArray.begin(), path);
     } else {
         _searchPathArray.push_back(path);
     }
+    _searchPathLock.writeUnlock();
 }
 
 void FileUtils::setFilenameLookupDictionary(const ValueMap& filenameLookupDict)
@@ -1063,9 +1089,15 @@ bool FileUtils::isDirectoryExist(const std::string& dirPath) const
     _cacheLock.readUnLock();
 
     std::string fullpath;
-    for (const auto& searchIt : _searchPathArray)
+    _searchPathLock.readLock();
+    std::vector<std::string> searchPathArray = _searchPathArray;
+    _searchPathLock.readUnLock();
+    _searchResolutionsOrderLock.readLock();
+    std::vector<std::string> searchResolutionsOrderArray = _searchResolutionsOrderArray;
+    _searchResolutionsOrderLock.readUnLock();
+    for (const auto& searchIt : searchPathArray)
     {
-        for (const auto& resolutionIt : _searchResolutionsOrderArray)
+        for (const auto& resolutionIt : searchResolutionsOrderArray)
         {
             // searchPath + file_path + resourceDirectory
             fullpath = fullPathForFilename(searchIt + dirPath + resolutionIt);
