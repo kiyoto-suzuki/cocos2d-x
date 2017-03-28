@@ -744,6 +744,8 @@ protected:
      * Read-Write SpinLock to make _fullPathCache thread-safe
      */
     mutable SpinRWLock _cacheLock;
+    mutable SpinRWLock _searchPathLock;
+    mutable SpinRWLock _searchResolutionsOrderLock;
 
     /**
      * Writable path.
