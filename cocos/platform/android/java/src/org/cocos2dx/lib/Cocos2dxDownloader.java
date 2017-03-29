@@ -222,10 +222,11 @@ public class Cocos2dxDownloader {
         return downloader;
     }
 
-    public static void createTask(final Cocos2dxDownloader downloader, int id_, String url_, String path_) {
+    public static void createTask(final Cocos2dxDownloader downloader, int id_, String url_, String path_, String cookie_) {
         final int id = id_;
         final String url = url_;
         final String path = path_;
+        final String cookie = cookie_;
 
         Runnable taskRunnable = new Runnable() {
             @Override
@@ -233,8 +234,15 @@ public class Cocos2dxDownloader {
                 DownloadTask task = new DownloadTask();
                 if (0 == path.length()) {
                     // data task
+                    Header[] headers = null;
+                    if (cookie.length() > 0) {
+                        List<Header> list = new ArrayList<Header>();
+                        list.add(new BasicHeader("Cookie", cookie));
+                        headers = list.toArray(new Header[list.size()]);
+                    }
                     task.handler = new DataTaskHandler(downloader, id);
-                    task.handle = downloader._httpClient.get(Cocos2dxHelper.getActivity(), url, task.handler);
+                    task.handle = downloader._httpClient.get(Cocos2dxHelper.getActivity(), url, headers, null, task.handler);
+                    //task.handle = downloader._httpClient.get(Cocos2dxHelper.getActivity(), url, task.handler);
                 }
 
                 do {
@@ -251,11 +259,16 @@ public class Cocos2dxDownloader {
 
                     task.handler = new FileTaskHandler(downloader, id, tempFile, finalFile);
                     Header[] headers = null;
+                    List<Header> list = new ArrayList<Header>();
+                    if (cookie.length() > 0) {
+                        list.add(new BasicHeader("Cookie", cookie));
+                    }
                     long fileLen = tempFile.length();
                     if (fileLen > 0) {
                         // continue download
-                        List<Header> list = new ArrayList<Header>();
                         list.add(new BasicHeader("Range", "bytes=" + fileLen + "-"));
+                    }
+                    if (list.size() > 0) {
                         headers = list.toArray(new Header[list.size()]);
                     }
                     task.handle = downloader._httpClient.get(Cocos2dxHelper.getActivity(), url, headers, null, task.handler);

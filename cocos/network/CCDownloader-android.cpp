@@ -38,6 +38,7 @@ using namespace std;
 static bool _registerNativeMethods(JNIEnv* env);
 
 unordered_map<int, cocos2d::network::DownloaderAndroid*> sDownloaderMap;
+unordered_map<int, std::string> sCookieMap;
 
 namespace cocos2d { namespace network {
 
@@ -84,6 +85,7 @@ namespace cocos2d { namespace network {
                 _impl = methodInfo.env->NewGlobalRef(jObj);
                 DLLOG("android downloader: jObj: %p, _impl: %p", jObj, _impl);
                 sDownloaderMap.insert(make_pair(_id, this));
+                sCookieMap.insert(make_pair(_id, ""));
                 methodInfo.env->DeleteLocalRef(jStr);
                 methodInfo.env->DeleteLocalRef(jObj);
                 methodInfo.env->DeleteLocalRef(methodInfo.classID);
@@ -108,6 +110,7 @@ namespace cocos2d { namespace network {
                     methodInfo.env->DeleteLocalRef(methodInfo.classID);
                 }
                 sDownloaderMap.erase(_id);
+                sCookieMap.erase(_id);
                 JniHelper::getEnv()->DeleteGlobalRef(_impl);
             }
             DLLOG("Destruct DownloaderAndroid: %p", this);
@@ -118,17 +121,30 @@ namespace cocos2d { namespace network {
             DownloadTaskAndroid *coTask = new DownloadTaskAndroid;
             coTask->task = task;
 
+            // see HttpClient-android.cpp
+            if (sCookieMap.find(_id) == sCookieMap.end()) 
+            {
+                std::string cookieFilename = FileUtils::getInstance()->getWritablePath() + "cookieFile.txt";
+                auto fullPath = FileUtils::getInstance()->fullPathForFilename(cookieFilename);
+                if (FileUtils::getInstance()->isFileExists(fullPath)) 
+                {
+                    sCookieMap[_id] = FileUtils::getInstance()->getStringFromFile(fullPath);
+                }
+            }
+
             JniMethodInfo methodInfo;
             if (JniHelper::getStaticMethodInfo(methodInfo,
                                                JCLS_DOWNLOADER,
                                                "createTask",
-                                               "(" JARG_DOWNLOADER "I" JARG_STR JARG_STR")V"))
+                                               "(" JARG_DOWNLOADER "I" JARG_STR JARG_STR JARG_STR")V"))
             {
-                jstring jstrURL = methodInfo.env->NewStringUTF(task->requestURL.c_str());
-                jstring jstrPath= methodInfo.env->NewStringUTF(task->storagePath.c_str());
-                methodInfo.env->CallStaticVoidMethod(methodInfo.classID, methodInfo.methodID, _impl, coTask->id, jstrURL, jstrPath);
+                jstring jstrURL    = methodInfo.env->NewStringUTF(task->requestURL.c_str());
+                jstring jstrPath   = methodInfo.env->NewStringUTF(task->storagePath.c_str());
+                jstring jstrCookie = methodInfo.env->NewStringUTF(sCookieMap[_id].c_str());
+                methodInfo.env->CallStaticVoidMethod(methodInfo.classID, methodInfo.methodID, _impl, coTask->id, jstrURL, jstrPath, jstrCookie);
                 methodInfo.env->DeleteLocalRef(jstrURL);
                 methodInfo.env->DeleteLocalRef(jstrPath);
+                methodInfo.env->DeleteLocalRef(jstrCookie);
                 methodInfo.env->DeleteLocalRef(methodInfo.classID);
             }
 
