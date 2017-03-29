@@ -879,7 +879,6 @@ void FileUtils::setSearchResolutionsOrder(const std::vector<std::string>& search
     _cacheLock.writeUnlock();
     _searchResolutionsOrderLock.writeLock();
     _searchResolutionsOrderArray.clear();
-    _searchResolutionsOrderLock.writeUnlock();
     for(const auto& iter : searchResolutionsOrder)
     {
         std::string resolutionDirectory = iter;
@@ -893,17 +892,14 @@ void FileUtils::setSearchResolutionsOrder(const std::vector<std::string>& search
             resolutionDirectory += "/";
         }
 
-        _searchResolutionsOrderLock.writeLock();
         _searchResolutionsOrderArray.push_back(resolutionDirectory);
-        _searchResolutionsOrderLock.writeUnlock();
     }
 
     if (!existDefault)
     {
-        _searchResolutionsOrderLock.writeLock();
         _searchResolutionsOrderArray.push_back("");
-        _searchResolutionsOrderLock.writeUnlock();
     }
+    _searchResolutionsOrderLock.writeUnlock();
 }
 
 void FileUtils::addSearchResolutionsOrder(const std::string &order,const bool front)
@@ -950,7 +946,6 @@ void FileUtils::setSearchPaths(const std::vector<std::string>& searchPaths)
     _cacheLock.writeUnlock();
     _searchPathLock.writeLock();
     _searchPathArray.clear();
-    _searchPathLock.writeUnlock();
     for (const auto& iter : searchPaths)
     {
         std::string prefix;
@@ -969,18 +964,15 @@ void FileUtils::setSearchPaths(const std::vector<std::string>& searchPaths)
         {
             existDefaultRootPath = true;
         }
-        _searchPathLock.writeLock();
         _searchPathArray.push_back(path);
-        _searchPathLock.writeUnlock();
     }
 
     if (!existDefaultRootPath)
     {
         //CCLOG("Default root path doesn't exist, adding it.");
-        _searchPathLock.writeLock();
         _searchPathArray.push_back(_defaultResRootPath);
-        _searchPathLock.writeUnlock();
     }
+    _searchPathLock.writeUnlock();
 }
 
 void FileUtils::addSearchPath(const std::string &searchpath,const bool front)
