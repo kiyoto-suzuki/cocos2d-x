@@ -8,6 +8,8 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.content.Intent;
+import android.net.Uri;
 
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -93,6 +95,12 @@ public class Cocos2dxWebView extends WebView {
                     });
                     return true;
                 }
+
+                if (uri != null && uri.getScheme().equals("mailto")) {
+                    activity.startActivity(new Intent(Intent.ACTION_SENDTO, Uri.parse(urlString)));
+                    return true;
+                }
+
             } catch (Exception e) {
                 Log.d(TAG, "Failed to create URI from url");
             }
